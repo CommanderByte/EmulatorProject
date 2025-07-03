@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from threading import Lock
-from typing import Dict, List, TYPE_CHECKING
+from typing import Dict, List
 
-
-from emulator.core.abstract.devices.signal_sink import SignalSink
+from emulator.core.abstract.signal.signal_sink import SignalSink
 
 
 class SignalSource(ABC):

@@ -1,23 +1,22 @@
 import logging
-from collections import defaultdict
 from threading import Lock
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from unicorn import (
     UC_HOOK_MEM_READ_UNMAPPED, UC_HOOK_MEM_WRITE_UNMAPPED,
     UC_HOOK_INSN, UC_MEM_WRITE_UNMAPPED
 )
 
-from emulator.core.abstract.devices.bus_participant import BusParticipant
-from emulator.core.abstract.devices.clocked_device import ClockedDevice
-from emulator.core.abstract.devices.dma_controller import DMAController
-from emulator.core.abstract.devices.interrupt_controller import InterruptController
-from emulator.core.abstract.devices.io_device import IODevice
-from emulator.core.abstract.devices.mmio_device import MMIODevice, MMIORange, CallbackMMIODevice, BackedMMIODevice
-from emulator.core.abstract.devices.resettable_device import ResettableDevice
-from emulator.core.abstract.devices.signal_sink import SignalSink
-from emulator.core.abstract.devices.signal_source import SignalSource
-from emulator.core.abstract.devices.tick_device import TickDevice
+from emulator.core.abstract.base.bus_participant import BusParticipant
+from emulator.core.abstract.time.clocked_device import ClockedDevice
+from emulator.core.abstract.dma.dma_controller import DMAController
+from emulator.core.abstract.irq.interrupt_controller import InterruptController
+from emulator.core.abstract.io.io_device import IODevice
+from emulator.core.abstract.mmio.mmio_device import MMIODevice, MMIORange, CallbackMMIODevice, BackedMMIODevice
+from emulator.core.abstract.reset.resettable_device import ResettableDevice
+from emulator.core.abstract.signal.signal_sink import SignalSink
+from emulator.core.abstract.signal.signal_source import SignalSource
+from emulator.core.abstract.time.tick_device import TickDevice
 
 logger = logging.getLogger(__name__)
 

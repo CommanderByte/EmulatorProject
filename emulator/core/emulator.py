@@ -3,10 +3,10 @@ from typing import List, Tuple, Any, Callable, Dict
 
 from unicorn import Uc, UC_PROT_NONE
 
-from emulator.core.abstract.devices.bus_participant import BusParticipant
-from emulator.core.abstract.devices.device import Device
-from emulator.core.abstract.devices.resettable_device import ResettableDevice
-from emulator.core.abstract.devices.tick_device import TickDevice
+from emulator.core.abstract.base.bus_participant import BusParticipant
+from emulator.core.abstract.base.device import Device
+from emulator.core.abstract.reset.resettable_device import ResettableDevice
+from emulator.core.abstract.time.tick_device import TickDevice
 from emulator.core.bus import Bus
 from emulator.core.hooks import HookManager
 

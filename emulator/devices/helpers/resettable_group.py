@@ -1,4 +1,4 @@
-from emulator.core.abstract.devices.resettable_device import ResettableDevice
+from emulator.core.abstract.reset.resettable_device import ResettableDevice
 
 
 class ResettableGroup(ResettableDevice):

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Union
 
-PortRange = Union[int, tuple[int, int]]  # Either a single port or a (start, end) tuple
+from emulator.core.abstract.io.port_range import PortRange
+
 
 class IODevice(ABC):
     """

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from emulator.core.abstract.devices.dma_device import DMADevice
+    from emulator.core.abstract.dma.dma_device import DMADevice
 
 logger = logging.getLogger(__name__)
 

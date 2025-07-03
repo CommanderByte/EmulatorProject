@@ -1,70 +1,12 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List, Optional, Callable, Any, Tuple
+from abc import abstractmethod
+from typing import Callable, Any, Optional, Tuple
+
 from unicorn import Uc
+
+from emulator.core.abstract.mmio.mmio_device import MMIODevice
 
 UC_MMIO_READ_TYPE = Callable[[Uc, int, int, Any], int]
 UC_MMIO_WRITE_TYPE = Callable[[Uc, int, int, int, Any], None]
-
-
-@dataclass(frozen=True)
-class MMIORange:
-    """
-    Represents a memory-mapped I/O (MMIO) range.
-
-    This class is used to define a range in a memory-mapped I/O system with a
-    specific start address and length. Instances are immutable due to the
-    dataclass being frozen.
-
-    :ivar start: Starting address of the MMIO range.
-    :type start: int
-    :ivar length: Length of the MMIO range in bytes.
-    :type length: int
-    """
-
-    start: int
-    length: int
-
-    def end(self) -> int:
-        """
-        Calculate and return the ending index by adding the starting index and the length.
-
-        :return: The ending index as an integer.
-        :rtype: int
-        """
-        return self.start + self.length
-
-
-class MMIODevice(ABC):
-    """
-    Represents an abstract base class for memory-mapped I/O (MMIO) devices.
-
-    This class serves as a blueprint for defining MMIO devices. It enforces the
-    implementation of methods for registering MMIO ranges that are critical for
-    device functionality. Subclasses inheriting from this class must provide
-    their own implementations for the abstract methods.
-
-    :ivar mmio_ranges: A list of memory-mapped I/O ranges that belong to the device.
-    :type mmio_ranges: List[MMIORange]
-    """
-
-    @abstractmethod
-    def register_mmio_ranges(self) -> List[MMIORange]:
-        """
-        Abstract method to register Memory-Mapped I/O (MMIO) address ranges required by
-        a specific implementation. This method must be implemented in a subclass to
-        define the MMIO regions needed for an operation or device initialization.
-
-        This process is essential for providing the necessary address ranges that
-        enable communication between the application and hardware components.
-
-        :raises NotImplementedError: If the subclass does not provide an implementation.
-
-        :return: A list of `MMIORange` instances that describe the MMIO regions.
-        :rtype: List[MMIORange]
-        """
-        pass
-
 
 class CallbackMMIODevice(MMIODevice):
     """
@@ -162,46 +104,3 @@ class CallbackMMIODevice(MMIODevice):
         :return: This method returns nothing.
         """
         self.on_mmio(address, size, value, True)
-
-
-class BackedMMIODevice(MMIODevice):
-    """
-    Provides an abstract base class for memory-mapped I/O devices
-    that support backing memory regions. This class outlines an
-    interface for retrieving memory regions that must be implemented
-    by subclasses.
-
-    This is designed to assist in managing and interacting with
-    hardware or virtual devices backed by specific memory regions.
-
-    Subclasses are required to define the behavior for retrieving
-    a list of memory regions by implementing the `get_backed_memory`
-    method.
-
-    :ivar device_name: Name of the device associated with this I/O region.
-    :type device_name: str
-    :ivar base_address: The base address of this memory-mapped device.
-    :type base_address: int
-    :ivar region_size: The size of the memory region mapped for the device.
-    :type region_size: int
-    """
-
-    @abstractmethod
-    def get_backed_memory(self) -> List[Tuple[int, bytes]]:
-        """
-        Abstract method to get a list of backed memory segments.
-
-        This method must be implemented by subclasses to provide a list of backed memory
-        segments. Each memory segment is represented as a tuple containing an integer and
-        a bytes object. The integer represents the address or offset, and the bytes object
-        contains the corresponding data in memory at that address.
-
-        The method is designed to be used in scenarios where memory segments are backed by
-        data, such as within certain virtualization or memory mapping contexts.
-
-        :raises NotImplementedError: If the method is not implemented by a subclass.
-
-        :return: A list of tuples where each tuple consists of an integer and a bytes object.
-        :rtype: List[Tuple[int, bytes]]
-        """
-        pass

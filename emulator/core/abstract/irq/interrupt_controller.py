@@ -2,9 +2,9 @@ import logging
 from typing import Callable, Optional, Literal, List
 from threading import Lock
 
-logger = logging.getLogger(__name__)
+from emulator.core.abstract.irq.trigger_type import TriggerType, EdgeTrigger, Polarity
 
-TriggerType = Literal["edge", "level"]
+logger = logging.getLogger(__name__)
 
 class InterruptController:
     """
@@ -56,7 +56,11 @@ class InterruptController:
         """
         self.irq_count = irq_count
         self.irq_lines = [False] * irq_count
-        self.trigger_types: List[TriggerType] = ["level"] * irq_count
+        self.trigger_types: List[TriggerType] = [
+            TriggerType(edge=EdgeTrigger.LEVEL, polarity=Polarity.ACTIVE_LOW)
+            for _ in range(irq_count)
+        ]
+
         self.irq_masked = [False] * irq_count
         self.irq_priority = list(range(irq_count))  # Default priority: lower index = higher priority
         self.lock = Lock()
@@ -79,46 +83,44 @@ class InterruptController:
         logger.info("🔌 IRQ handler connected")
 
     def raise_irq(self, irq: int):
-        """
-        Raises an IRQ (Interrupt Request) signal based on the specified index and the
-        configured behavior (edge-triggered or level-triggered). The method checks
-        whether the IRQ is masked, and if so, logs the information and exits without
-        taking any further actions. For unmasked IRQs, it processes the signal based
-        on its trigger type and handles the assertion accordingly.
-
-        :param irq: The index of the IRQ to be raised.
-        :type irq: int
-        :return: None
-        """
         with self.lock:
             if self.irq_masked[irq]:
                 logger.debug(f"🚫 IRQ {irq} is masked, ignored")
                 return
 
-            if self.trigger_types[irq] == "edge":
-                logger.debug(f"📣 IRQ {irq} edge triggered")
+            trig = self.trigger_types[irq]
+
+            # EDGE
+            if trig.edge == EdgeTrigger.EDGE or trig.edge in (EdgeTrigger.RISING, EdgeTrigger.FALLING,
+                                                              EdgeTrigger.BOTH):
+                logger.debug(f"📣 IRQ {irq} edge-triggered ({trig})")
                 if self.irq_callback:
                     self.irq_callback(irq, True)
-            elif not self.irq_lines[irq]:
-                self.irq_lines[irq] = True
-                logger.debug(f"📣 IRQ {irq} level asserted")
-                if self.irq_callback:
-                    self.irq_callback(irq, True)
+
+            # LEVEL
+            elif trig.edge == EdgeTrigger.LEVEL:
+                active_state = trig.polarity == Polarity.ACTIVE_HIGH
+                if self.irq_lines[irq] != active_state:
+                    self.irq_lines[irq] = active_state
+                    logger.debug(f"📣 IRQ {irq} level-triggered ({trig})")
+                    if self.irq_callback:
+                        self.irq_callback(irq, True)
 
     def lower_irq(self, irq: int):
-        """
-        Clears or lowers the specified interrupt request (IRQ) line. If the IRQ line is currently active,
-        this method sets it to inactive and logs the operation. Additionally, if an IRQ callback is defined,
-        it triggers the callback with the IRQ index and the new state (set to False).
-
-        :param irq: Index of the interrupt request line to clear. Must be an integer.
-        :type irq: int
-        :return: None
-        """
         with self.lock:
-            if self.irq_lines[irq]:
-                self.irq_lines[irq] = False
-                logger.debug(f"🔕 IRQ {irq} cleared")
+            trig = self.trigger_types[irq]
+
+            if trig.edge == EdgeTrigger.LEVEL:
+                inactive_state = trig.polarity == Polarity.ACTIVE_HIGH
+                if self.irq_lines[irq] == inactive_state:
+                    self.irq_lines[irq] = not inactive_state
+                    logger.debug(f"🔕 IRQ {irq} level deasserted")
+                    if self.irq_callback:
+                        self.irq_callback(irq, False)
+
+            elif trig.edge in (EdgeTrigger.RISING, EdgeTrigger.FALLING, EdgeTrigger.BOTH, EdgeTrigger.EDGE):
+                # Edge-triggered interrupts are assumed to auto-clear after callback
+                logger.debug(f"🔕 IRQ {irq} edge complete")
                 if self.irq_callback:
                     self.irq_callback(irq, False)
 
@@ -175,22 +177,10 @@ class InterruptController:
             logger.debug(f"🔧 IRQ {irq} mask set to {masked}")
 
     def set_trigger_type(self, irq: int, trigger_type: TriggerType):
-        """
-        Sets the trigger type for a specified IRQ (Interrupt Request Line). The trigger
-        type determines how the hardware or software will respond to the specified
-        interrupts, whether it is triggered by a level or edge signal.
-
-        :param irq: The number of the IRQ to configure.
-        :type irq: int
-        :param trigger_type: The type of trigger for the IRQ, either 'edge' or 'level'.
-        :type trigger_type: TriggerType
-        :return: None
-        """
         with self.lock:
-            if trigger_type not in ("edge", "level"):
-                raise ValueError("Invalid trigger type: must be 'edge' or 'level'")
             self.trigger_types[irq] = trigger_type
             logger.debug(f"⚙️ IRQ {irq} trigger type set to {trigger_type}")
+
 
     def set_priority(self, irq: int, priority: int):
         """
