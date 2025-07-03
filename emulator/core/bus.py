@@ -21,63 +21,9 @@ from emulator.core.abstract.time.tick_device import TickDevice
 logger = logging.getLogger(__name__)
 
 class Bus:
-    """
-    Represents a system bus for managing communication and interaction between
-    various devices in an emulated environment.
-
-    The Bus class is responsible for registering and managing devices that
-    use memory-mapped I/O (MMIO), standard I/O ports, signaling, and other
-    functionalities such as Direct Memory Access (DMA) or interrupt handling.
-    It also provides hooks for memory and I/O access within the emulator.
-
-    :ivar emulator: Emulator instance managing this bus.
-    :ivar _lock: Internal locking mechanism for thread-safe device operations.
-    :ivar io_ranges: List of registered I/O ranges and their corresponding devices.
-    :ivar mmio_devices: List of registered memory-mapped I/O ranges and devices.
-    :ivar tick_devices: List of devices requiring periodic ticks.
-    :ivar clocked_devices: List of devices operating with clock cycles.
-    :ivar resettable_devices: List of devices supporting state reset.
-    :ivar signal_sources: List of devices that act as signal sources.
-    :ivar signal_sinks: List of devices that receive signals.
-    :ivar dma_controller: Instance of the DMAController managing DMA operations,
-        or None if not present.
-    :ivar interrupt_controller: Instance of the InterruptController managing
-        interrupt requests, or None if not present.
-    """
+    """Manage device registration and MMIO/IO dispatch."""
     def __init__(self, emulator):
-        """
-        Represents a central management system for handling devices, memory-mapped I/O (MMIO), and
-        various controllers within an emulator. This class is responsible for managing device
-        registration, MMIO hooks, and I/O access within the emulator's environment.
-
-        Attributes
-        ----------
-        emulator : Any
-            The emulator instance this class interacts with.
-        _lock : Lock
-            A threading lock to ensure thread-safe operations.
-        io_ranges : list
-            A list of registered I/O ranges.
-        mmio_devices : list
-            A list of registered MMIO devices.
-        tick_devices : list
-            A list of devices that require periodic tick updates.
-        clocked_devices : list
-            A list of devices synchronized with a clock source.
-        resettable_devices : list
-            A list of devices that support a reset mechanism.
-        signal_sources : list
-            A list of signal-producing devices or components.
-        signal_sinks : list
-            A list of signal-consuming devices or components.
-        dma_controller : Optional[DMAController]
-            A direct memory access (DMA) controller instance, if applicable.
-        interrupt_controller : Optional[InterruptController]
-            An interrupt controller instance, if applicable.
-
-        :param emulator: The emulator object that integrates the device and I/O management system.
-        :type emulator: Any
-        """
+        """Create a bus attached to ``emulator``."""
         self.emulator = emulator
         self._lock = Lock()
         self.io_ranges = []

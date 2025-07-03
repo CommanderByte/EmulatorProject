@@ -1,3 +1,4 @@
+"""Entry point for running the BIOS emulator example."""
 from unicorn.x86_const import UC_X86_REG_EIP
 
 from emulator.platforms.bios_x86 import setup_bios_x86
