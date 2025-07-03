@@ -1,0 +1,23 @@
+.idea/
+__pycache__/
+*.pyc
+.venv/
+
+# Python packaging artifacts
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+ENV/
+
+# Python bytecode
+*.pyo
+*.pyd
+
+# mypy
+.mypy_cache/
+
+# pytest
+.pytest_cache/
