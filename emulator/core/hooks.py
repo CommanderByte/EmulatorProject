@@ -5,56 +5,47 @@ from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE, UC_HOOK_M
 logger = logging.getLogger(__name__)
 
 class HookManager:
-    """
-    Manages the registration, removal, and tracking of Unicorn hooks.
+    """Lightweight wrapper for Unicorn hook registration.
 
-    This class is designed to work with the Unicorn Engine for emulation purposes.
-    It facilitates the addition, removal, and management of hooks in the Unicorn
-    emulation instance.
-
-    :ivar uc: Unicorn engine instance used for hook registration.
-    :type uc: Uc
-    :ivar hooks: List to track registered hooks. Each hook is represented as a
-        dictionary containing details such as the hook's handle, type, callback,
-        address range, and optional user data.
-    :type hooks: List[Dict[str, Any]]
+    Attributes
+    ----------
+    uc : Uc
+        Unicorn engine instance used for hook registration.
+    hooks : List[Dict[str, Any]]
+        Internal list of registered hooks with metadata.
     """
 
     def __init__(self, uc: Uc):
-        """
-        Represents an object initialized with a given unit of computation (`uc`)
-        and maintains a collection of hooks that allow for tracking or modifying
-        specific functionality during the execution cycle.
+        """Create a hook manager for the given Unicorn instance.
 
-        Attributes:
-            uc (Uc): The unit of computation that the object is associated with.
-            hooks (List[Dict[str, Any]]): A collection of dictionary objects used
-            to manage various hooks that can be integrated into the execution logic.
-
-        :param uc: The unit of computation to initialize the instance with.
-        :type uc: Uc
+        Parameters
+        ----------
+        uc : Uc
+            Unicorn instance to manage hooks for.
         """
         self.uc = uc
         self.hooks: List[Dict[str, Any]] = []
 
     def add_hook(self, hook_type: int, callback: Callable, begin: int = 1, end: int = 0, user_data: Any = None):
-        """
-        Add a hook to the Unicorn engine and manage it within the current instance. The method allows
-        registration of a hook of a specific type with a given callback and address range. The hook
-        is stored internally in a structured format for easier handling.
+        """Register a hook with Unicorn and store its handle.
 
-        :param hook_type: Type of the hook to be added.
-        :type hook_type: int
-        :param callback: Callable function that is executed when the hook is triggered.
-        :type callback: Callable
-        :param begin: Start address of the memory range for the hook. Defaults to 1.
-        :type begin: int, optional
-        :param end: End address of the memory range for the hook. Defaults to 0.
-        :type end: int, optional
-        :param user_data: User-defined data passed to the callback. Defaults to None.
-        :type user_data: Any, optional
-        :return: Handle to the created hook or None if the operation fails.
-        :rtype: Optional[Any]
+        Parameters
+        ----------
+        hook_type : int
+            Hook type constant.
+        callback : Callable
+            Function to call when the hook triggers.
+        begin : int, optional
+            Start address for the hook range, defaults to ``1``.
+        end : int, optional
+            End address for the hook range, defaults to ``0``.
+        user_data : Any, optional
+            Optional data passed to the callback.
+
+        Returns
+        -------
+        Optional[Any]
+            Handle returned by Unicorn or ``None`` on failure.
         """
         try:
             handle = self.uc.hook_add(hook_type, callback, user_data, begin, end)
@@ -73,14 +64,12 @@ class HookManager:
             return None
 
     def remove_hook(self, handle):
-        """
-        Removes a hook from the Unicorn Engine's hook list and logs the process. Ensures
-        that the specified hook handle is deleted, and updates the internal hook list
-        accordingly.
+        """Remove a hook by handle.
 
-        :param handle: The identifier for the hook to be removed.
-        :type handle: any
-        :return: None
+        Parameters
+        ----------
+        handle : Any
+            Hook handle previously returned by :meth:`add_hook`.
         """
         try:
             self.uc.hook_del(handle)
@@ -90,22 +79,7 @@ class HookManager:
             logger.error(f"❌ Failed to remove hook: {e}")
 
     def clear_all(self):
-        """
-        Clears all registered hooks in the system.
-
-        This method iterates through a list of hooks and attempts to remove each hook
-        using a provided `hook_del` function. If an exception occurs during the removal
-        of a hook, it logs a warning with the specific error message. Once all
-        available hooks are processed, the method clears the list of hooks and logs
-        an informational message to indicate that the operation has completed.
-
-        :param self:
-            The object instance containing the `hooks` list and the `uc` (uncertain)
-            object responsible for hook removal functionality.
-
-        :return:
-            None
-        """
+        """Remove all registered hooks."""
         for hook in self.hooks:
             try:
                 self.uc.hook_del(hook["handle"])
@@ -115,10 +89,11 @@ class HookManager:
         logger.info("🧹 All hooks cleared")
 
     def list_hooks(self):
-        """
-        Provides a method to retrieve and return the list of hooks associated with the object.
+        """Return the list of currently registered hooks.
 
-        :return: The list of hooks.
-        :rtype: list
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Details of each registered hook.
         """
         return self.hooks

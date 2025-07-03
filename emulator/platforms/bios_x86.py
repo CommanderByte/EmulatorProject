@@ -13,6 +13,7 @@ from unicorn import UC_ARCH_X86, UC_MODE_16, UC_HOOK_CODE, UC_HOOK_MEM_READ_UNMA
 logger = logging.getLogger(__name__)
 
 def setup_bios_x86(bios_path: str) -> Emulator:
+    """Initialise an x86 BIOS platform and return an Emulator."""
     BIOS_MAIN_ADDR = 0xF0000
     BIOS_MAIN_SIZE = 0x10000
     BIOS_BACKUP_ADDR = 0xFFC00000
