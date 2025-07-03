@@ -7,7 +7,7 @@ from unicorn import (
     UC_HOOK_INSN, UC_MEM_WRITE_UNMAPPED
 )
 
-from emulator.core.abstract.base.bus_participant import BusParticipant
+from emulator.core.abstract.bus.bus_participant import BusParticipant
 from emulator.core.abstract.time.clocked_device import ClockedDevice
 from emulator.core.abstract.dma.dma_controller import DMAController
 from emulator.core.abstract.irq.interrupt_controller import InterruptController
