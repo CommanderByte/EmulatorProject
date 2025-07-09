@@ -1,4 +1,5 @@
-"""TPM device implementations."""
+from .tpm import *
 
-__all__: list[str] = []
-
+__all__ = [
+    'tpm',
+]

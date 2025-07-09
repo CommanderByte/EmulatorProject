@@ -1,217 +1,122 @@
 import logging
-from typing import List, Tuple, Any, Callable, Dict
+from typing import List, Tuple, Any
 
-from unicorn import Uc, UC_PROT_NONE
+from unicorn import Uc, UC_PROT_NONE, UcError, UC_ERR_FETCH_UNMAPPED
 
-from emulator.core.abstract.bus.bus_participant import BusParticipant
-from emulator.core.abstract.base.device import Device
-from emulator.core.abstract.reset.resettable_device import ResettableDevice
-from emulator.core.abstract.time.tick_device import TickDevice
-from emulator.core.bus import Bus
-from emulator.core.hooks import HookManager
+# Core hook mixins
+from emulator.core.hooks.base import HookMixin
+from emulator.core.hooks.memory import MemoryHookMixin
+from emulator.core.hooks.code import CodeHookMixin
+from emulator.core.hooks.x86 import ExceptionHookMixin
+
+# x86-specific hooks you care about:
+from emulator.core.hooks.x86.pci import PCIHookMixin
+from emulator.core.hooks.x86.segment import SegmentMixin
+from emulator.core.hooks.x86.msr import MSRMixin
+from emulator.core.hooks.x86.cpuid import CPUIDHookMixin
+# … import any others you’ll use, e.g. IOPortHookMixin, ExceptionHookMixin, etc.
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PERMISSIONS = UC_PROT_NONE
 
-class Emulator:
-    """High level wrapper around the Unicorn engine.
-
-    Attributes
-    ----------
-    unicorn : Uc
-        Underlying Unicorn engine instance.
-    hook_manager : HookManager
-        Manages registered execution hooks.
-    bus : Bus
-        System bus used to connect devices.
-    devices : List[Device]
-        List of currently attached devices.
-    hooks : List[Dict[str, Any]]
-        Collection of Unicorn hooks added via :meth:`add_hook`.
-    memory_map : Dict[int, Tuple[int, int]]
-        Mapping of base address to ``(size, permissions)``.
-    running : bool
-        ``True`` while emulation is active.
+class Emulator(PCIeHookMixin,
+               SegmentMixin,
+               MSRMixin,
+               CPUIDHookMixin,
+               ExceptionHookMixin,
+               MemoryHookMixin,
+               CodeHookMixin,
+               HookMixin,
+               ):
     """
+    High‐level wrapper around Unicorn, using mixins instead of a monolithic Bus.
+    Devices attach themselves by mapping memory or registering hooks via the mixins.
+    """
+    def __init__(self, arch: int, mode: int):
+        # Instantiate Unicorn first
+        self.uc = Uc(arch, mode)
+        # Initialize all mixins with the Uc instance
+        super().__init__(self.uc)
 
-    def __init__(self, architecture: int, mode: int):
-        """Initialize Unicorn and supporting structures.
+        self.devices: List[Any] = []
+        self.memory_map: dict[int, Tuple[int,int]] = {}
 
-        Parameters
-        ----------
-        architecture : int
-            Unicorn architecture constant, e.g. ``UC_ARCH_X86``.
-        mode : int
-            Mode flag for the architecture, e.g. ``UC_MODE_32``.
+    def add_device(self, device: Any):
         """
-        self.unicorn = Uc(architecture, mode)
-        self.hook_manager = HookManager(self.unicorn)
-        self.bus = Bus(self)
-        self.devices: List[Device] = []
-        self.hooks: List[Dict[str, Any]] = []
-        self.memory_map: Dict[int, Tuple[int, int]] = {}
-        self.running = False
-
-    def add_device(self, device: Device):
-        """Attach ``device`` to the emulator and bus.
-
-        Parameters
-        ----------
-        device : Device
-            Device instance to attach.
+        Attach a Device to this Emulator. The Device.attach()
+        method should set up any required memory maps or hooks.
         """
         device.attach(self)
         self.devices.append(device)
+        logger.info(f"Device attached: {device.__class__.__name__}")
 
-        if isinstance(device, BusParticipant):
-            device.on_bus_connect(self.bus)
-
-        # Bus will handle IODevice, MMIODevice, etc.
-        self.bus.attach_device(device)
-
-    def detach_device(self, device: Device):
-        """Remove ``device`` from the emulator and bus.
-
-        Parameters
-        ----------
-        device : Device
-            The device instance to detach.
+    def map_memory(self,
+                   address: int,
+                   size: int,
+                   perms: int = DEFAULT_PERMISSIONS,
+                   content: bytes = b""):
         """
-        if device in self.devices:
-            if isinstance(device, BusParticipant):
-                device.on_bus_disconnect()
-
-            self.bus.detach_device(device)
-
-            self.devices.remove(device)
-            device.detach()
-
-    def is_device_attached(self, device: Device) -> bool:
-        """Return ``True`` if ``device`` is attached.
-
-        Parameters
-        ----------
-        device : Device
-            The device to query.
-
-        Returns
-        -------
-        bool
-            ``True`` if the device is present.
-        """
-        return device in self.devices
-
-    def map_memory(self, address: int, region_size: int, permissions: int = DEFAULT_PERMISSIONS, content: bytes = b""):
-        """Map a region of memory and optionally populate ``content``.
-
-        Parameters
-        ----------
-        address : int
-            Base address for the region.
-        region_size : int
-            Size of the memory region in bytes.
-        permissions : int, optional
-            Unicorn permission flags. Defaults to ``DEFAULT_PERMISSIONS``.
-        content : bytes, optional
-            Data to write into the region after mapping.
-
-        Raises
-        ------
-        ValueError
-            If the address is already mapped.
+        Map and (optionally) initialize a region of guest memory.
         """
         if address in self.memory_map:
-            raise ValueError(f"Memory at address {address:#x} is already mapped.")
-        self._set_memory_map(address, region_size, permissions, content)
-        self.memory_map[address] = (region_size, permissions)
-
-    def _set_memory_map(self, address: int, region_size: int, permissions: int, content: bytes):
-        """Internal helper to map memory and write ``content``.
-
-        Parameters
-        ----------
-        address : int
-            Start address for the region.
-        region_size : int
-            Size of the region in bytes.
-        permissions : int
-            Memory access flags.
-        content : bytes
-            Data to write after mapping.
-        """
-        if not isinstance(address, int) or not isinstance(region_size, int):
-            raise TypeError("Address and region size must be integers.")
-        if address < 0 or region_size <= 0:
-            raise ValueError(f"Invalid address {address:#x} or region size {region_size}.")
-        try:
-            self.unicorn.mem_map(address, region_size, permissions)
-        except Exception as e:
-            logger.error(f"Memory mapping failed at {address:#x} with size {region_size}. Error: {e}")
-        self._write_mem_content(address, content)
-
-    def _write_mem_content(self, address: int, content: bytes):
-        """Write ``content`` to ``address`` if provided.
-
-        Parameters
-        ----------
-        address : int
-            Destination address.
-        content : bytes
-            Data to write.
-        """
+            raise ValueError(f"0x{address:08X} already mapped")
+        self.uc.mem_map(address, size, perms)
         if content:
-            self.unicorn.mem_write(address, content)
+            self.uc.mem_write(address, content)
+        self.memory_map[address] = (size, perms)
+        logger.debug(f"Mapped 0x{address:08X}-0x{address+size-1:08X}")
 
-    def add_hook(self, hook_type: int, callback: Callable):
-        """Register a Unicorn hook and track it.
+    def run(self, start: int, end: int, count: int = 0):
+        try:
+            self.uc.emu_start(start, end, count=count)
+        except UcError as e:
+            if e.errno == UC_ERR_FETCH_UNMAPPED:
+                # 1) Print out all mapped regions
+                print("=== Memory map ===")
+                for base, (size, perms) in sorted(self.memory_map.items()):
+                    print(f"  0x{base:08X} – 0x{base + size - 1:08X}\t size=0x{size:X}\t perms=0x{perms:X}")
 
-        Parameters
-        ----------
-        hook_type : int
-            Hook type constant from Unicorn.
-        callback : Callable
-            Function to invoke when the hook triggers.
-        """
-        self.unicorn.hook_add(hook_type, callback)
-        self.hooks.append({"type": hook_type, "callback": callback})
+                # 2) Find the highest‐addressed region
+                max_base = max(self.memory_map)
+                size, perms = self.memory_map[max_base]
+                end_addr = max_base + size
 
-    def run(self, start_address: int, end_address: int, instruction_count: int = 0):
-        """Run the emulator between ``start_address`` and ``end_address``.
+                # 3) Read & print its last 16 bytes
+                try:
+                    tail = self.uc.mem_read(end_addr - 16, 16)
+                    hexstr = " ".join(f"{b:02X}" for b in tail)
+                    print(f"\nLast 16 bytes of 0x{max_base:08X}-0x{end_addr - 1:08X}:")
+                    print(f"  {hexstr}")
+                except UcError:
+                    print(f"Could not read last 16 bytes at 0x{end_addr - 16:08X}")
 
-        Parameters
-        ----------
-        start_address : int
-            Starting program counter value.
-        end_address : int
-            Stop address (exclusive).
-        instruction_count : int, optional
-            Maximum number of instructions to execute.
-        """
-        self.running = True
-        self.unicorn.emu_start(start_address, end_address, count=instruction_count)
+            # re-raise so you still see the original traceback if you want
+            raise
 
     def reset(self):
-        """Reset all attached :class:`ResettableDevice` instances."""
-        for device in self.devices:
-            if isinstance(device, ResettableDevice):
-                device.reset()
+        """
+        Call `reset()` on any device that defines it.
+        """
+        for dev in self.devices:
+            reset_fn = getattr(dev, "reset", None)
+            if callable(reset_fn):
+                reset_fn()
 
     def tick(self):
-        """Issue a single tick to all :class:`TickDevice` instances."""
-        for device in self.devices:
-            if isinstance(device, TickDevice):
-                device.tick(1)
+        """
+        Call `tick(1)` on any device that defines `tick()`
+        """
+        for dev in self.devices:
+            tick_fn = getattr(dev, "tick", None)
+            if callable(tick_fn):
+                tick_fn(1)
 
     def clock(self, cycles: int = 1):
-        """Clock all devices that provide a ``clock`` method.
-
-        Parameters
-        ----------
-        cycles : int, optional
-            Number of cycles to pass to each device, by default ``1``.
         """
-        for device in self.devices:
-            clock_method = getattr(device, "clock", None)
-            if callable(clock_method):
-                clock_method(cycles)
+        Call `clock(cycles)` on any clocked device.
+        """
+        for dev in self.devices:
+            clk = getattr(dev, "clock", None)
+            if callable(clk):
+                clk(cycles)

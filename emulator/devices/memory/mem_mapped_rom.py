@@ -1,8 +1,8 @@
 import logging
 from typing import List
 
-from emulator.core.abstract.base.device import Device
-from emulator.core.abstract.mmio.mmio_device import MMIORange, BackedMMIODevice
+from emulator.core.abstract.base import Device
+from emulator.core.abstract.mmio import BackedMMIODevice, MMIORange
 
 logger = logging.getLogger(__name__)
 

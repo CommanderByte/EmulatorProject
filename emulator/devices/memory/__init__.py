@@ -1,7 +1,7 @@
-"""Memory related device implementations."""
+from .mem_mapped_ram import *
+from .mem_mapped_rom import *
 
-from .mem_mapped_ram import MemoryMappedRAM
-from .mem_mapped_rom import MemoryMappedROM
-
-__all__ = ["MemoryMappedRAM", "MemoryMappedROM"]
-
+__all__ = [
+    'mem_mapped_ram',
+    'mem_mapped_rom',
+]

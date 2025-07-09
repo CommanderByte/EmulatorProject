@@ -1,18 +1,15 @@
-"""Convenience access to the device registry utilities."""
-
-from .device_registry import DeviceRegistry
-from .global_registry import REGISTRY
-from .aliases import resolve_alias
-from .lookup import search, startswith
-from .introspection import dump_registry_tree
-from .capabilities import get_capabilities
+from .aliases import *
+from .capabilities import *
+from .device_registry import *
+from .global_registry import *
+from .introspection import *
+from .lookup import *
 
 __all__ = [
-    "DeviceRegistry",
-    "REGISTRY",
-    "resolve_alias",
-    "search",
-    "startswith",
-    "dump_registry_tree",
-    "get_capabilities",
+    'aliases',
+    'capabilities',
+    'device_registry',
+    'global_registry',
+    'introspection',
+    'lookup',
 ]

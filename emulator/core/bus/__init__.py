@@ -1,19 +1,11 @@
-"""Bus implementations used by the emulator."""
-
-from .io_bus import IOBus
-from .mmio_bus import MMIOBus
-from .irq_bus import IRQBus
-from .lpc_bus import LPCBus
-from .isa_bus import ISABus
-from .pci_bus import PCIBus
-from .named_bus import NamedBus
+from .irq_bus import *
+from .lpc_bus import *
+from .mmio_bus import *
+from .named_bus import *
 
 __all__ = [
-    "IOBus",
-    "MMIOBus",
-    "IRQBus",
-    "LPCBus",
-    "ISABus",
-    "PCIBus",
-    "NamedBus",
+    'irq_bus',
+    'lpc_bus',
+    'mmio_bus',
+    'named_bus',
 ]

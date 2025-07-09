@@ -1,21 +1,19 @@
-"""Meta mixins for devices."""
-
-from .attachable import Attachable
-from .connectable import Connectable
-from .debuggable import DebuggableDevice
-from .persistable import PersistableDevice
-from .named_device import NamedDevice
-from .user_controllable import UserControllableDevice
-from .configurable import ConfigurableDevice
-from .memory_backed import MemoryBackedDevice
+from .attachable import *
+from .configurable import *
+from .connectable import *
+from .debuggable import *
+from .memory_backed import *
+from .named_device import *
+from .persistable import *
+from .user_controllable import *
 
 __all__ = [
-    "Attachable",
-    "Connectable",
-    "DebuggableDevice",
-    "PersistableDevice",
-    "NamedDevice",
-    "UserControllableDevice",
-    "ConfigurableDevice",
-    "MemoryBackedDevice",
+    'attachable',
+    'configurable',
+    'connectable',
+    'debuggable',
+    'memory_backed',
+    'named_device',
+    'persistable',
+    'user_controllable',
 ]

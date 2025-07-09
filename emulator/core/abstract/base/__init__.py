@@ -1,6 +1,7 @@
-"""Base device abstractions."""
+from .device import *
+from .device_info import *
 
-from .device import Device
-from .device_info import DeviceInfo
-
-__all__ = ["Device", "DeviceInfo"]
+__all__ = [
+    'device',
+    'device_info',
+]

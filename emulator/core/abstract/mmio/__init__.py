@@ -1,13 +1,11 @@
-"""Memory mapped I/O device abstractions."""
-
-from .mmio_device import MMIODevice
-from .mmio_range import MMIORange
-from .callback_mmio import CallbackMMIODevice
-from .backed_mmio import BackedMMIODevice
+from .backed_mmio import *
+from .callback_mmio import *
+from .mmio_device import *
+from .mmio_range import *
 
 __all__ = [
-    "MMIODevice",
-    "MMIORange",
-    "CallbackMMIODevice",
-    "BackedMMIODevice",
+    'backed_mmio',
+    'callback_mmio',
+    'mmio_device',
+    'mmio_range',
 ]

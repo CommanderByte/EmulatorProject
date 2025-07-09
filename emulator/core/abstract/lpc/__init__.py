@@ -1,5 +1,5 @@
-"""LPC device abstractions."""
+from .lpc_device import *
 
-from .lpc_device import LPCDevice
-
-__all__ = ["LPCDevice"]
+__all__ = [
+    'lpc_device',
+]

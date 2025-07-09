@@ -1,6 +1,7 @@
-"""Clock and tick based device abstractions."""
+from .clocked_device import *
+from .tick_device import *
 
-from .clocked_device import ClockedDevice
-from .tick_device import TickDevice
-
-__all__ = ["ClockedDevice", "TickDevice"]
+__all__ = [
+    'clocked_device',
+    'tick_device',
+]

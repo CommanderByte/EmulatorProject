@@ -1,5 +1,5 @@
-"""ISA device abstractions."""
+from .isa_device import *
 
-from .isa_device import ISADevice
-
-__all__ = ["ISADevice"]
+__all__ = [
+    'isa_device',
+]

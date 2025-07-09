@@ -1,6 +1,7 @@
-"""DMA controller and device abstractions."""
+from .dma_controller import *
+from .dma_device import *
 
-from .dma_controller import DMAController
-from .dma_device import DMADevice
-
-__all__ = ["DMAController", "DMADevice"]
+__all__ = [
+    'dma_controller',
+    'dma_device',
+]

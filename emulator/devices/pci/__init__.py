@@ -1,4 +1,5 @@
-"""PCI related devices (placeholder)."""
+from .config_space import *
 
-__all__: list[str] = []
-
+__all__ = [
+    'config_space',
+]

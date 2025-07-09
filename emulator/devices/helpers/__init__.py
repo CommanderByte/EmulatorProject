@@ -1,7 +1,7 @@
-"""Helper devices and utilities."""
+from .noop import *
+from .resettable_group import *
 
-from .noop import NoopDevice
-from .resettable_group import ResettableGroup
-
-__all__ = ["NoopDevice", "ResettableGroup"]
-
+__all__ = [
+    'noop',
+    'resettable_group',
+]

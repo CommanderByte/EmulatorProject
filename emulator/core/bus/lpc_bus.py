@@ -1,4 +1,4 @@
-from emulator.core.bus.io_bus import IOBus
+from emulator.core.bus.x86.io_bus import IOBus
 from emulator.core.bus.mmio_bus import MMIOBus
 
 class LPCBus(IOBus, MMIOBus):

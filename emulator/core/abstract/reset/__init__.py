@@ -1,6 +1,7 @@
-"""Device reset support."""
+from .resettable_device import *
+from .resettable_group import *
 
-from .resettable_device import ResettableDevice
-from .resettable_group import ResettableGroup
-
-__all__ = ["ResettableDevice", "ResettableGroup"]
+__all__ = [
+    'resettable_device',
+    'resettable_group',
+]
