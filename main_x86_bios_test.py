@@ -10,15 +10,13 @@ from unicorn.unicorn_const import (
     UC_HOOK_CODE,
     UC_HOOK_INSN,
     UC_HOOK_MEM_READ_UNMAPPED,
-    UC_HOOK_MEM_WRITE_UNMAPPED, UC_HOOK_MEM_WRITE_PROT,
+    UC_HOOK_MEM_WRITE_UNMAPPED, UC_HOOK_MEM_WRITE_PROT, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE,
 )
 from unicorn.x86_const import UC_X86_INS_CPUID, UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_EDX, UC_X86_REG_ECX, \
     UC_X86_REG_RIP, UC_X86_REG_EIP, UC_X86_INS_MOV, UC_X86_REG_CR0
 
 from emulator.core.emulator import Emulator
-from emulator.core.hooks import hook
 from emulator.platforms.x86.bios_x86 import setup_bios_x86
-from emulator.core.constants import DEFAULT_PERMISSIONS
 
 # Configure root logger
 def configure_logging():
@@ -73,10 +71,10 @@ def main():
             logger.info(f"0x{insn.address:08X}: {insn.mnemonic}\t{insn.op_str}")
         return False  # continue dispatch
 
-        # register basic-block hook
+    # register basic-block hook
     emu.add_hook(UC_HOOK_CODE, log_block)
 
-        # 4. x86-specific CPUID trap
+    # 4. x86-specific CPUID trap
     def fake_cpuid(uc, user_data):
         eax = uc.reg_read(UC_X86_REG_EAX)
         logging.info(f"CPUID EAX={eax}")
@@ -125,21 +123,21 @@ def main():
         handle_mem_prot
     )
 
-    @hook(UC_HOOK_INSN, extra=(UC_X86_INS_MOV,))
-    def catch_mov_to_cr0(uc, insn, user_data):
-        # disassemble and check operands, same as our old mixin did…
-        for op in insn.operands:
-            if op.type == X86_OP_REG and op.reg == UC_X86_REG_CR0:
-                print("CR0 was modified")
-                val = uc.reg_read(UC_X86_REG_CR0)
-                if val & 1:
-                    print("Entered Protected Mode")
-                else:
-                    print("Left Protected Mode")
-                # here you could call emu.stop() and re-create the Unicorn engine
-        return True
+    def catch_cr0_read(uc, access, addr, size, value, user_data):
+        logger.info(f"[CR0 READ]  value=0x{value:08X}")
+        return False
 
-    pprint(emu.list_hooks())
+    def catch_cr0_write(uc, access, addr, size, value, user_data):
+        logger.info(f"[CR0 WRITE] new=0x{value:08X}")
+        if value & 1:
+            logger.info("→ Entered Protected Mode")
+        else:
+            logger.info("→ Left Protected Mode")
+        return False
+
+    # filter on CR0 register ID
+    emu.add_hook(UC_HOOK_MEM_READ, catch_cr0_read, extra=(UC_X86_REG_CR0,))
+    emu.add_hook(UC_HOOK_MEM_WRITE, catch_cr0_write, extra=(UC_X86_REG_CR0,))
 
         # 6. Print memory regions
     for region in emu.unicorn.mem_regions():

@@ -1,39 +1,36 @@
 """
-Mixin for CPUID instruction hooks.
+Adapter for CPUID instruction hook.
 """
-# emulator/core/hooks/x86/cpuid.py
-
-from typing import Any, Callable
+from capstone.x86_const import X86_INS_CPUID
 from unicorn.unicorn_const import UC_HOOK_INSN
-from unicorn.x86_const     import UC_X86_INS_CPUID
+from .common import InsnHookConfig
 
-from emulator.core import HookMixin
+class CpuidHook:
+    CONFIG = InsnHookConfig(
+        hook_type=UC_HOOK_INSN,
+        insns=(X86_INS_CPUID,),
+        priority=100,
+    )
 
-
-class CPUIDHookMixin(HookMixin):
-    def on_cpuid(
-        self,
-        callback: Callable[[Any, Any], bool],
-        begin:    int = 1,
-        end:      int = 0,
-        user_data: Any = None
-    ) -> int:
+    @staticmethod
+    def register(hooks, handler) -> int:
         """
-        Hook the CPUID instruction (all leaves).
+        Subscribe `handler` to CPUID instruction.
 
-        callback signature:
-          def callback(uc, user_data) -> bool
-
-        Return True to continue emulation, False to stop.
-
-        Returns the hook handle.
+        Handler receives (uc, leaf) and returns (eax, ebx, ecx, edx).
         """
-        return self.add_hook(
-            UC_HOOK_INSN,
-            callback,
-            user_data,
-            begin,
-            end,
-            UC_X86_INS_CPUID
+        cfg = CpuidHook.CONFIG
+        def _cb(uc, insn, user_data):
+            leaf = uc.reg_read(uc.const.X86_REG_RAX)
+            eax, ebx, ecx, edx = handler(uc, leaf)
+            uc.reg_write(uc.const.X86_REG_RAX, eax)
+            uc.reg_write(uc.const.X86_REG_RBX, ebx)
+            uc.reg_write(uc.const.X86_REG_RCX, ecx)
+            uc.reg_write(uc.const.X86_REG_RDX, edx)
+            return True
+        return hooks.add_hook(
+            cfg.hook_type,
+            _cb,
+            priority=cfg.priority,
+            extra=cfg.insns
         )
-

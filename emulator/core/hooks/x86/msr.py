@@ -1,70 +1,38 @@
 """
-Mixin for MSR read/write hooks.
+Adapter for RDMSR and WRMSR instructions.
 """
+from typing import Tuple
+
+from capstone.x86_const import X86_INS_RDMSR, X86_INS_WRMSR
 from unicorn.unicorn_const import UC_HOOK_INSN
-from emulator.core.hooks.base import HookMixin
+from .common import InsnHookConfig
 
-from typing import Any, Callable
-from unicorn.unicorn_const import UC_HOOK_INSN
-from unicorn.x86_const import UC_X86_INS_RDMSR, UC_X86_INS_WRMSR
+class MsrHook:
+    CONFIG_RD = InsnHookConfig(hook_type=UC_HOOK_INSN, insns=(X86_INS_RDMSR,), priority=100)
+    CONFIG_WR = InsnHookConfig(hook_type=UC_HOOK_INSN, insns=(X86_INS_WRMSR,), priority=100)
 
-class MSRMixin(HookMixin):
-    def on_msr_read(
-        self,
-        msr_id: int,
-        callback: Callable[[Any, int, Any], bool],
-        begin:   int = 1,
-        end:     int = 0,
-        user_data: Any = None
-    ) -> int:
+    @staticmethod
+    def register(hooks, rd_handler, wr_handler) -> Tuple[int, int]:
         """
-        Hook RDMSR for the given MSR ID (in ECX).
-        callback signature: (uc, msr_id, user_data) -> bool
+        Subscribe `rd_handler` to RDMSR and `wr_handler` to WRMSR.
+
+        rd_handler(uc, msr_id) -> int
+        wr_handler(uc, msr_id, value) -> None
         """
-        def _cb(uc, user_data):
-            current = uc.reg_read(uc.regs.ECX)
-            if current == msr_id:
-                # invoke user callback
-                return callback(uc, current, user_data)
+        rd_cfg = MsrHook.CONFIG_RD
+        wr_cfg = MsrHook.CONFIG_WR
+        def _rd(uc, insn, user_data):
+            msr = uc.reg_read(uc.const.X86_REG_ECX)
+            val = rd_handler(uc, msr)
+            uc.reg_write(uc.const.X86_REG_RAX, val & 0xFFFFFFFF)
+            uc.reg_write(uc.const.X86_REG_RDX, val >> 32)
             return True
-
-        return self.add_hook(
-            UC_HOOK_INSN,
-            _cb,
-            user_data,
-            begin,
-            end,
-            UC_X86_INS_RDMSR
-        )
-
-    def on_msr_write(
-        self,
-        msr_id: int,
-        callback: Callable[[Any, int, int, Any], bool],
-        begin:   int = 1,
-        end:     int = 0,
-        user_data: Any = None
-    ) -> int:
-        """
-        Hook WRMSR for the given MSR ID (in ECX).
-        callback signature: (uc, msr_id, value, user_data) -> bool
-        """
-        def _cb(uc, user_data):
-            current = uc.reg_read(uc.regs.ECX)
-            if current == msr_id:
-                # combine EDX:EAX into a 64-bit value
-                low  = uc.reg_read(uc.regs.EAX)
-                high = uc.reg_read(uc.regs.EDX)
-                val  = (high << 32) | low
-                return callback(uc, current, val, user_data)
+        def _wr(uc, insn, user_data):
+            msr = uc.reg_read(uc.const.X86_REG_ECX)
+            lo = uc.reg_read(uc.const.X86_REG_RAX)
+            hi = uc.reg_read(uc.const.X86_REG_RDX)
+            wr_handler(uc, msr, (hi << 32) | lo)
             return True
-
-        return self.add_hook(
-            UC_HOOK_INSN,
-            _cb,
-            user_data,
-            begin,
-            end,
-            UC_X86_INS_WRMSR
-        )
-
+        h1 = hooks.add_hook(rd_cfg.hook_type, _rd, priority=rd_cfg.priority, extra=rd_cfg.insns)
+        h2 = hooks.add_hook(wr_cfg.hook_type, _wr, priority=wr_cfg.priority, extra=wr_cfg.insns)
+        return (h1, h2)
