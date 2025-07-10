@@ -6,7 +6,6 @@ from unicorn.x86_const import UC_X86_REG_CS, UC_X86_REG_IP
 from emulator.core.emulator import Emulator
 from emulator.devices.memory.mem_mapped_rom import MemoryMappedROM
 from unicorn import UC_ARCH_X86, UC_MODE_16, UC_MEM_WRITE_UNMAPPED, UC_MEM_READ_UNMAPPED
-from emulator.core.hooks import CodeHookMixin
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +31,6 @@ def setup_bios_x86(bios_path: str) -> Emulator:
     # Instantiate emulator (inherits hook mixins internally)
     emu = Emulator(arch=UC_ARCH_X86, mode=UC_MODE_16)
 
-    # Create and register ROM devices
-    main_rom   = MemoryMappedROM(base_addr=BIOS_MAIN_ADDR,   data=bios[-BIOS_MAIN_SIZE:])
-    backup_rom = MemoryMappedROM(base_addr=BIOS_BACKUP_ADDR, data=bios)
-    emu.add_device(main_rom)
-    emu.add_device(backup_rom)
-
     # Optionally pre-map TPM MMIO region
     # emu.map_memory(TPM_MMIO_ADDR, TPM_MMIO_SIZE)
 
@@ -46,7 +39,7 @@ def setup_bios_x86(bios_path: str) -> Emulator:
 
 
     # Set reset vector (CS:IP = F000:FFF0)
-    emu.uc.reg_write(UC_X86_REG_CS, 0xF000)
-    emu.uc.reg_write(UC_X86_REG_IP, 0xFFF0)
+    emu.unicorn.reg_write(UC_X86_REG_CS, 0xF000)
+    emu.unicorn.reg_write(UC_X86_REG_IP, 0xFFF0)
 
     return emu

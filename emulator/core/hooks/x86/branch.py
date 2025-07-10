@@ -6,7 +6,7 @@ from typing import Any, Callable
 from unicorn.unicorn_const import UC_HOOK_CODE
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32, CS_GRP_JUMP
 
-from emulator.core import HookMixin
+from emulator.core.hooks import HookMixin
 
 
 class BranchTraceHookMixin(HookMixin):

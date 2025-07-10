@@ -1,125 +1,155 @@
 #!/usr/bin/env python3
 import logging
 import sys
+from pprint import pprint
 
-from capstone import Cs, CS_ARCH_X86, CS_MODE_32, CS_MODE_16
-from unicorn import UC_ARCH_X86, UC_MODE_32, UC_PROT_READ, UC_PROT_EXEC, UC_PROT_WRITE, UC_PROT_ALL
-from unicorn.x86_const import UC_X86_INS_PUSH, UC_X86_INS_POPF, UC_X86_INS_POP, UC_X86_INS_PUSHF
-
-from emulator.platforms.x86.bios_x86 import setup_bios_x86
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(levelname)s: %(message)s'
+from capstone import Cs, CS_ARCH_X86, CS_MODE_16
+from capstone.x86_const import X86_OP_REG
+from unicorn import UC_ARCH_X86, UC_MODE_32, UC_PROT_READ, UC_PROT_EXEC, UC_PROT_WRITE
+from unicorn.unicorn_const import (
+    UC_HOOK_CODE,
+    UC_HOOK_INSN,
+    UC_HOOK_MEM_READ_UNMAPPED,
+    UC_HOOK_MEM_WRITE_UNMAPPED, UC_HOOK_MEM_WRITE_PROT,
 )
+from unicorn.x86_const import UC_X86_INS_CPUID, UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_EDX, UC_X86_REG_ECX, \
+    UC_X86_REG_RIP, UC_X86_REG_EIP, UC_X86_INS_MOV, UC_X86_REG_CR0
 
-# import your refactored setup function & core emulator
+from emulator.core.emulator import Emulator
+from emulator.core.hooks import hook
+from emulator.platforms.x86.bios_x86 import setup_bios_x86
+from emulator.core.constants import DEFAULT_PERMISSIONS
+
+# Configure root logger
+def configure_logging():
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(levelname)s: %(message)s'
+    )
+    logger = logging.getLogger()
+    logger.debug("Logging configured at DEBUG level")
+
 
 def main():
-    # 1. Locate BIOS image (pass path on cmdline or default to bios.bin)
+    configure_logging()
+    logger = logging.getLogger(__name__)
+
+    # 1. Locate BIOS image
     bios_path = sys.argv[1] if len(sys.argv) > 1 else 'emulator/data/BIOS_t610_1_20.bin'
     try:
         with open(bios_path, 'rb') as f:
             bios = f.read()
     except FileNotFoundError:
-        print(f"ERROR: BIOS image not found at {bios_path}")
+        logger.error("BIOS image not found at %s", bios_path)
         sys.exit(1)
 
     # 2. Build and configure your emulator + hooks
-    emu = setup_bios_x86(bios_path)
-    # map BIOS region and write the blob
-    print(len(bios))
-    emu.map_memory(0xFFC00000, len(bios), perms=UC_PROT_READ | UC_PROT_EXEC, content=bios)
+    emu: Emulator = setup_bios_x86(bios_path)
 
+    # Map BIOS region
+    emu.map_memory(
+        0xFFC00000,
+        len(bios),
+        permissions=UC_PROT_READ | UC_PROT_EXEC,
+        content=bios
+    )
+
+    # Map low BIOS copy
     CHUNK_SIZE = 0x10_0000
-    emu.map_memory(0x00000, 0x10_0000,
-                   perms=UC_PROT_READ | UC_PROT_EXEC ,content=bios[-CHUNK_SIZE:])
+    emu.map_memory(
+        0x00000,
+        CHUNK_SIZE,
+        permissions=UC_PROT_READ | UC_PROT_EXEC,
+        content=bios[-CHUNK_SIZE:]
+    )
 
-    # 3. Example “generic” hook: dump every basic block
-    # create one disassembler for reuse
-    md = Cs(CS_ARCH_X86, CS_MODE_16)
-    md.detail = False  # turn on if you want operand/lift info
+    # 3. Generic basic-block hook
+    disasm = Cs(CS_ARCH_X86, CS_MODE_16)
+    disasm.detail = False
 
     def log_block(uc, address, size, user_data):
-        # read the raw bytes of the block
         code = uc.mem_read(address, size)
-        # disassemble and print each instruction
-        for insn in md.disasm(code, address):
-            print(f"0x{insn.address:08X}:  {insn.mnemonic}\t{insn.op_str}")
+        for insn in disasm.disasm(code, address):
+            logger.info(f"0x{insn.address:08X}: {insn.mnemonic}\t{insn.op_str}")
+        return False  # continue dispatch
 
-    # hook every basic block
-    emu.on_code(log_block)
+        # register basic-block hook
+    emu.add_hook(UC_HOOK_CODE, log_block)
 
-    # 4. Example “x86-specific” hook: trap all CPUID calls
+        # 4. x86-specific CPUID trap
     def fake_cpuid(uc, user_data):
-        # 1) Emulated CPUID behavior:
-        eax = uc.reg_read(uc.regs.EAX)
+        eax = uc.reg_read(UC_X86_REG_EAX)
+        logging.info(f"CPUID EAX={eax}")
         if eax == 0:
-            uc.reg_write(uc.regs.EAX, 1)
-            uc.reg_write(uc.regs.EBX, 0x756e6547)  # "Genu"
-            uc.reg_write(uc.regs.EDX, 0x49656e69)  # "ineI"
-            uc.reg_write(uc.regs.ECX, 0x6c65746e)  # "ntel"
-
-        # 2) Figure out the instruction size so we can skip it
-
-        # 4) Return True to continue
+            # return highest-supported leaf and "GenuineIntel"
+            uc.reg_write(UC_X86_REG_EAX, 1)
+            uc.reg_write(UC_X86_REG_EBX, 0x756e6547)
+            uc.reg_write(UC_X86_REG_EDX, 0x49656e69)
+            uc.reg_write(UC_X86_REG_ECX, 0x6c65746e)
+        # advance RIP past CPUID instruction
+        rip = uc.reg_read(UC_X86_REG_EIP)
+        uc.reg_write(UC_X86_REG_EIP, rip + 2)
         return True
-    emu.on_cpuid(fake_cpuid)
 
-    def find_free_page(memory_map: dict[int, tuple[int, int]],
-                       *,
-                       page_size: int = 0x1000,
-                       start_addr: int = 0x0100_0000) -> int:
-        """
-        Given memory_map: base -> (size, perms), find the first gap
-        ≥ page_size at or above start_addr.
-        """
-        # build sorted list of (base, end)
-        intervals = sorted(
-            (base, base + size)
-            for base, (size, _) in memory_map.items()
-            if base + size > start_addr
-        )
-        logger.debug(f"sorted intervals: {intervals}")
-        candidate = start_addr
-        for base, end in intervals:
-            if candidate + page_size <= base:
-                return candidate
-            candidate = max(candidate, end)
-        return candidate
+        # register CPUID hook
+    emu.add_hook(
+        UC_HOOK_INSN,
+        fake_cpuid,
+        extra=(UC_X86_INS_CPUID,)
+    )
 
+        # 5. Memory-invalid and protection hooks
     def handle_mem_invalid(uc, access, addr, size, value, user_data):
-        print(f"[MEM_INVALID] addr=0x{addr:08X}, size={size}")
+        logger.info(f"[MEM_INVALID] addr=0x{addr:08X}, size={size}")
         return True
 
-    emu.on_mem_invalid(handle_mem_invalid,begin=0,end=0xFFFFFFFF)
+    emu.add_hook(
+        UC_HOOK_MEM_READ_UNMAPPED,
+        handle_mem_invalid
+    )
+
+    emu.add_hook(
+        UC_HOOK_MEM_WRITE_UNMAPPED,
+        handle_mem_invalid
+    )
+
+        # Protection fault
 
     def handle_mem_prot(uc, access, addr, size, value, user_data):
-        print(f"[MEM_PROT] addr=0x{addr:08X}, size={size}")
+        logger.info(f"[MEM_PROT] addr=0x{addr:08X}, size={size}")
         return True
 
-    def skip_stack_insn(uc, access, addr, size, user_data):
-        # just advance EIP past the instruction; don't touch any regs or mem
-        uc.reg_write(uc.regs.EIP, addr + size)
+    emu.add_hook(
+        # XN or write-protect traps
+        UC_HOOK_MEM_WRITE_PROT,
+        handle_mem_prot
+    )
+
+    @hook(UC_HOOK_INSN, extra=(UC_X86_INS_MOV,))
+    def catch_mov_to_cr0(uc, insn, user_data):
+        # disassemble and check operands, same as our old mixin did…
+        for op in insn.operands:
+            if op.type == X86_OP_REG and op.reg == UC_X86_REG_CR0:
+                print("CR0 was modified")
+                val = uc.reg_read(UC_X86_REG_CR0)
+                if val & 1:
+                    print("Entered Protected Mode")
+                else:
+                    print("Left Protected Mode")
+                # here you could call emu.stop() and re-create the Unicorn engine
         return True
 
-    # hook all the x86 push/pop variants
-    #emu.on_instruction(UC_X86_INS_PUSH, skip_stack_insn)
-    #emu.on_instruction(UC_X86_INS_POP, skip_stack_insn)
+    pprint(emu.list_hooks())
 
-    # register your new handler before emu.run(...)
-    emu.on_mem_prot(handle_mem_prot,begin=0,end=0xFFFFFFFF)
-
-    # Print memory layout
-    for region in emu.uc.mem_regions():
+        # 6. Print memory regions
+    for region in emu.unicorn.mem_regions():
         start, end, perms = region
-        print(f"REGION: 0x{start:08X}-0x{end - 1:08X} perms=0x{perms:X}")
+        logging.info(f"REGION: 0x{start:08X}-0x{end - 1:08X} perms=0x{perms:X}")
 
-    # 5. start
-    print(f"Reset vector = {0xFFFFFFF0} → starting emulation")
-    emu.run(0xFFFFFFF0, 0x100000)  # until you hit a hook or timeout
+        # 7. Start execution
+    logger.info("Starting at reset vector 0xFFFFFFF0")
+    emu.run(0xFFFFFFF0, 0x00100000)
+
 
 if __name__ == '__main__':
     main()
