@@ -1,12 +1,13 @@
-"""Collection of builtin devices."""
-
-from .memory import MemoryMappedRAM, MemoryMappedROM
-from .helpers import NoopDevice, ResettableGroup
+from . import cpu
+from . import helpers
+from . import memory
+from . import pci
+from . import tpm
 
 __all__ = [
-    "MemoryMappedRAM",
-    "MemoryMappedROM",
-    "NoopDevice",
-    "ResettableGroup",
+    'cpu',
+    'helpers',
+    'memory',
+    'pci',
+    'tpm',
 ]
-

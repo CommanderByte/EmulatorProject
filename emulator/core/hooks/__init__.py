@@ -1,11 +1,7 @@
-from .base import *
-from .code import *
 from .manager import *
-from .memory import *
+from . import x86
 
 __all__ = [
-    'base',
-    'code',
     'manager',
-    'memory',
+    'x86',
 ]

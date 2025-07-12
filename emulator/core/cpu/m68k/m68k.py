@@ -7,8 +7,8 @@ class M68KCPU(CPU):
     """
     M68K-specific CPU: sets up code-execution hooks.
     """
-    def __init__(self, uc, hooks):
-        super().__init__(uc, hooks)
+    def __init__(self, unicorn, hooks):
+        super().__init__(unicorn, hooks)
         # Optional: configure UC_ARCH_M68K/UC_MODE_M68K_000 on `uc` here
 
     def setup_hooks(self):

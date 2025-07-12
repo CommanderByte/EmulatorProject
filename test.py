@@ -171,7 +171,7 @@ def pci_config_hook(uc, port, size, value, is_write):
     return False
 
 if __name__ == "__main__":
-    bios = BIOSEmulator("emulator/data/BIOS_t610_1_20.bin")
+    bios = BIOSEmulator("data/BIOS_t610_1_20.bin")
     bios.io.register(pci_config_hook)
     print(f"EIP is 0x{bios.uc.reg_read(UC_X86_REG_EIP):08X}")
     bios.run()

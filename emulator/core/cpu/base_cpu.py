@@ -15,13 +15,13 @@ class CPU(abc.ABC):
     """
     def __init__(
         self,
-        uc: Uc,
+        unicorn: Uc,
         hooks: HookManager,
         event_bus: Optional[EventBus] = None,
         *,
         bit_mode: int = 64
     ):
-        self.uc = uc
+        self.unicorn = unicorn
         self.hooks = hooks
         self.event_bus = event_bus or EventBus()
         self.bit_mode = bit_mode
